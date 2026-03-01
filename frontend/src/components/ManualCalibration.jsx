@@ -56,8 +56,13 @@ export default function ManualCalibration({ cameraId }) {
    * Redraw points when they change
    */
   useEffect(() => {
-    if (points.length > 0 && videoDimensions) {
+    if (points.length > 0 && videoDimensions && canvasRef.current) {
       drawPoints(points);
+    } else if (points.length === 0 && canvasRef.current) {
+      // Clear canvas when points are reset
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
   }, [points, videoDimensions]);
 
@@ -129,6 +134,18 @@ export default function ManualCalibration({ cameraId }) {
     const newPoints = [...points, [x, y]];
     setPoints(newPoints);
     setStatus(`Added point ${newPoints.length}: (${x}, ${y})`);
+
+    // Debug logging
+    console.log('🎯 Point added:', { x, y, total: newPoints.length });
+    console.log('📐 Canvas dimensions:', {
+      width: canvas.width,
+      height: canvas.height,
+      offsetWidth: canvas.offsetWidth,
+      offsetHeight: canvas.offsetHeight
+    });
+    console.log('📹 Video dimensions:', videoDimensions);
+
+    // Force immediate redraw
     drawPoints(newPoints);
   };
 
@@ -137,7 +154,13 @@ export default function ManualCalibration({ cameraId }) {
    */
   const drawPoints = (pointsToDraw) => {
     const canvas = canvasRef.current;
-    if (!canvas || !videoDimensions) return;
+    if (!canvas || !videoDimensions) {
+      console.warn('⚠️ drawPoints: Canvas or videoDimensions not ready', {
+        canvas: !!canvas,
+        videoDimensions
+      });
+      return;
+    }
 
     const ctx = canvas.getContext('2d');
     const rect = canvas.getBoundingClientRect();
@@ -146,6 +169,13 @@ export default function ManualCalibration({ cameraId }) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (pointsToDraw.length === 0) return;
+
+    console.log('✏️ Drawing points:', {
+      count: pointsToDraw.length,
+      points: pointsToDraw,
+      canvasSize: { width: canvas.width, height: canvas.height },
+      rectSize: { width: rect.width, height: rect.height }
+    });
 
     // Calculate scale factors
     const scaleX = rect.width / videoDimensions.width;

@@ -1,12 +1,23 @@
 """
-Send Driver Alert to Backend
-============================
+Send Driver Alert to Backend + Play PA Audio
+=============================================
 
-Simple helper to POST driver alerts when risk >= 0.85
+Sends alert to backend AND plays audio locally via PA system
 """
 
 import requests
 import time
+
+# Try to import PA system (optional)
+PA_SYSTEM = None
+try:
+    from simple_pa_system import SimplePASystem
+    PA_SYSTEM = SimplePASystem()
+    print("✓ PA System initialized for driver alerts")
+except ImportError:
+    print("⚠ PA System not available (install pygame for audio)")
+except Exception as e:
+    print(f"⚠ PA System initialization failed: {e}")
 
 
 def send_driver_alert(
@@ -14,10 +25,11 @@ def send_driver_alert(
     risk_score: float,
     camera_id: str = "platform_3_camA",
     distance_from_edge: float = None,
-    backend_url: str = "http://localhost:8000"
+    backend_url: str = "http://localhost:8000",
+    play_audio: bool = True
 ):
     """
-    Send driver alert to backend API
+    Send driver alert to backend API + play PA audio
 
     Args:
         track_id: Person track ID
@@ -25,6 +37,7 @@ def send_driver_alert(
         camera_id: Camera identifier
         distance_from_edge: Distance from platform edge in pixels
         backend_url: Backend API URL
+        play_audio: Play beep sound via PA system (default: True)
 
     Returns:
         bool: True if successful, False otherwise
@@ -42,6 +55,20 @@ def send_driver_alert(
     # Only send if risk >= 0.85
     if risk_score < 0.85:
         return False
+
+    # Play audio FIRST (instant alert for driver)
+    if play_audio and PA_SYSTEM:
+        try:
+            if risk_score >= 0.95:
+                # Emergency level - play emergency buzzer
+                print("🚨 Playing EMERGENCY buzzer...")
+                PA_SYSTEM.play_emergency_buzzer()
+            else:
+                # Critical level (0.85-0.94) - play driver alert beep
+                print("🚨 Playing driver alert beep...")
+                PA_SYSTEM.play_driver_alert()
+        except Exception as e:
+            print(f"⚠ Audio playback failed: {e}")
 
     payload = {
         "track_id": track_id,

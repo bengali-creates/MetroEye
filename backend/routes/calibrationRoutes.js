@@ -25,9 +25,20 @@ const execPromise = util.promisify(exec);
 // Import Calibration model for MongoDB
 const Calibration = require('../models/Calibration');
 
+// Load camera configuration
+const CAMERA_CONFIG_PATH = path.join(__dirname, '../config/cameras.json');
+let cameraConfig = {};
+try {
+  const configData = fsSync.readFileSync(CAMERA_CONFIG_PATH, 'utf-8');
+  cameraConfig = JSON.parse(configData);
+} catch (error) {
+  console.warn('⚠️ Could not load camera config:', error.message);
+}
+
 // Path to calibration configs (saved by Python - for backward compatibility)
 const CONFIGS_DIR = path.join(__dirname, '../../vision-engine/configs');
 const PYTHON_SCRIPT = path.join(__dirname, '../../vision-engine/edge_calibrator.py');
+const VIDEO_DIR = path.join(__dirname, '../../vision-engine');
 
 /**
  * Helper: Get config file path for a camera
@@ -291,7 +302,7 @@ router.post('/:cameraId/manual', async (req, res) => {
  *
  * Request body:
  * {
- *   "video_path": "/path/to/video.mp4",
+ *   "video_path": "/path/to/video.mp4",  // optional, falls back to camera config
  *   "method": "auto" | "yolo" | "hough",  // optional, default: "auto"
  *   "force": true | false                  // optional, recalibrate even if exists
  * }
@@ -300,18 +311,37 @@ router.post('/:cameraId/auto', async (req, res) => {
   const { cameraId } = req.params;
   const { video_path, method = 'auto', force = false } = req.body;
 
-  if (!video_path) {
-    return res.status(400).json({
-      error: 'video_path required'
-    });
-  }
-
   try {
+    // Get video path from camera config if not provided
+    let actualVideoPath = video_path;
+
+    if (!actualVideoPath || actualVideoPath.startsWith('http')) {
+      // If video_path is a stream URL or not provided, use config
+      const camera = cameraConfig.cameras?.[cameraId];
+      if (!camera || !camera.video_source) {
+        return res.status(400).json({
+          error: `No video source configured for ${cameraId}. Please add to backend/config/cameras.json`
+        });
+      }
+
+      // Resolve video path relative to vision-engine directory
+      actualVideoPath = path.join(VIDEO_DIR, camera.video_source);
+      console.log(`📹 Using configured video source: ${camera.video_source}`);
+    }
+
+    // Verify video file exists
+    if (!fsSync.existsSync(actualVideoPath)) {
+      return res.status(400).json({
+        error: `Video file not found: ${actualVideoPath}`,
+        hint: 'Check backend/config/cameras.json and ensure video file exists in vision-engine/'
+      });
+    }
+
     // Build Python command
     const forceFlag = force ? '--force' : '';
-    const command = `python "${PYTHON_SCRIPT}" --video "${video_path}" --camera "${cameraId}" --method ${method} ${forceFlag}`;
+    const command = `python "${PYTHON_SCRIPT}" --video "${actualVideoPath}" --camera "${cameraId}" --method ${method} ${forceFlag}`;
 
-    console.log(`Running auto calibration: ${command}`);
+    console.log(`🤖 Running auto calibration: ${command}`);
 
     // Execute Python script (this may take 10-30 seconds)
     const { stdout, stderr } = await execPromise(command, {

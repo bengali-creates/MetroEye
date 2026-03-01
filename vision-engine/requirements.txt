@@ -83,6 +83,14 @@ python-dateutil>=2.8.2          # Date and time utilities
 # Install with: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
 
 # ============================================
+# FACE & EMOTION RECOGNITION
+# ============================================
+
+deepface>=0.0.79                # Face recognition + emotion detection (no compilation needed!)
+tensorflow>=2.13.0              # Backend for DeepFace
+# Alternative: fer>=22.5.1      # Lightweight emotion recognition only
+
+# ============================================
 # OPTIONAL: ADDITIONAL FEATURES
 # ============================================
 
@@ -91,4 +99,3 @@ python-dateutil>=2.8.2          # Date and time utilities
 # uvicorn>=0.23.0               # ASGI server for FastAPI
 # websockets>=11.0              # WebSocket support for real-time alerts
 # redis>=4.6.0                  # Redis cache for performance
-P
